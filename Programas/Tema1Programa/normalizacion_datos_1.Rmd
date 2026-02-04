@@ -1,0 +1,296 @@
+---
+title: "Estandarización vs Normalización de Datos"
+author: "Tractament de les Dades - Universidad de Valencia"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+    number_sections: true
+    latex_engine: xelatex
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    theme: united
+    highlight: tango
+header-includes:
+  - \usepackage{fontspec}
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = "", warning = FALSE, message = FALSE)
+```
+
+# Introducción
+
+En el proceso de **limpieza y procesamiento de datos**, es fundamental distinguir entre dos conceptos que a menudo se confunden:
+
+- **Estandarización de datos (sentido amplio)**: Proceso completo de transformar TODOS los datos a un formato coherente y utilizable
+- **Normalización/Escalado (sentido específico)**: Operación específica sobre variables numéricas para llevarlas a una escala común
+
+La **estandarización amplia** INCLUYE la normalización como uno de sus pasos, pero va mucho más allá.
+
+---
+
+# Datos de ejemplo
+
+Creamos un conjunto de datos con problemas típicos de formato:
+
+```{r datos-brutos}
+# Datos brutos con problemas de formato
+datos_brutos <- data.frame(
+  nombre = c("Ana García", "PEDRO lópez", "  María Torres", "juan Pérez  ", "Lucía Martín"),
+  edad = c(22, 19, 25, NA, 23),
+  horas_estudio = c(15, 8, 20, 12, 18),
+  nivel = c("Grado", "grado", "MÁSTER", "  Grado ", "Postgrado"),
+  ciudad = c("Valencia", "madrid", "BARCELONA", "valencia ", "  Madrid"),
+  beca = c("Sí", "No", "si", "NO", "SÍ"),
+  nota_media = c(7.5, 5.2, 8.9, 6.1, 7.8),
+  stringsAsFactors = FALSE
+)
+
+print(datos_brutos)
+```
+
+**Problemas identificados:**
+
+- Espacios en blanco innecesarios
+- Inconsistencia en mayúsculas/minúsculas
+- Valores categóricos no uniformes
+- Valores faltantes (NA)
+
+---
+
+# Paso 1: Corrección de Formatos
+
+## Eliminar espacios en blanco
+
+```{r correccion-espacios}
+# Eliminar espacios al inicio y final
+datos_brutos$nombre <- trimws(datos_brutos$nombre)
+datos_brutos$nivel <- trimws(datos_brutos$nivel)
+datos_brutos$ciudad <- trimws(datos_brutos$ciudad)
+```
+
+## Uniformizar mayúsculas/minúsculas
+
+```{r correccion-mayusculas}
+# Nombres propios: Primera letra mayúscula
+datos_brutos$nombre <- tools::toTitleCase(tolower(datos_brutos$nombre))
+datos_brutos$ciudad <- tools::toTitleCase(tolower(datos_brutos$ciudad))
+
+# Categorías: Capitalizar primera letra
+datos_brutos$nivel <- paste0(toupper(substring(datos_brutos$nivel, 1, 1)), 
+                              tolower(substring(datos_brutos$nivel, 2)))
+```
+
+## Estandarizar valores categóricos
+
+```{r correccion-categoricas}
+# Estandarizar valores booleanos
+datos_brutos$beca <- tolower(datos_brutos$beca)
+datos_brutos$beca[datos_brutos$beca %in% c("sí", "si")] <- "Sí"
+datos_brutos$beca[datos_brutos$beca == "no"] <- "No"
+```
+
+## Resultado después de corrección
+
+```{r resultado-formatos}
+print(datos_brutos)
+```
+
+---
+
+# Paso 2: Imputación de Valores Faltantes
+
+```{r imputacion}
+# Rellenar valores faltantes con la mediana
+datos_brutos$edad[is.na(datos_brutos$edad)] <- median(datos_brutos$edad, na.rm = TRUE)
+
+print("Después de imputación:")
+print(datos_brutos)
+```
+
+**Nota:** La mediana es más robusta que la media ante valores atípicos.
+
+---
+
+# Paso 3: Codificación de Variables Categóricas
+
+## Variable booleana (Sí/No → 1/0)
+
+```{r codificacion-booleana}
+datos_brutos$beca_num <- ifelse(datos_brutos$beca == "Sí", 1, 0)
+```
+
+## Variable ordinal (con orden jerárquico)
+
+```{r codificacion-ordinal}
+# Grado < Postgrado < Máster
+nivel_orden <- c("Grado" = 1, "Postgrado" = 2, "Máster" = 3)
+datos_brutos$nivel_num <- nivel_orden[datos_brutos$nivel]
+```
+
+## Variable nominal (One-Hot Encoding)
+
+```{r codificacion-nominal}
+# One-Hot Encoding para ciudad
+datos_brutos$ciudad_Barcelona <- ifelse(datos_brutos$ciudad == "Barcelona", 1, 0)
+datos_brutos$ciudad_Madrid <- ifelse(datos_brutos$ciudad == "Madrid", 1, 0)
+datos_brutos$ciudad_Valencia <- ifelse(datos_brutos$ciudad == "Valencia", 1, 0)
+```
+
+## Resultado después de codificación
+
+```{r resultado-codificacion}
+print(datos_brutos)
+```
+
+---
+
+# Paso 4: Normalización (Sentido Específico)
+
+Solo aplicamos normalización a **variables numéricas continuas**.
+
+## Variables a normalizar
+
+```{r variables-numericas}
+columnas_num <- c("edad", "horas_estudio", "nota_media")
+```
+
+## Método 1: Min-Max Normalization (rango 0-1)
+
+**Fórmula:**
+$$X_{norm} = \frac{X - X_{min}}{X_{max} - X_{min}}$$
+
+```{r min-max}
+# Función para normalización Min-Max
+min_max_norm <- function(x) {
+  (x - min(x)) / (max(x) - min(x))
+}
+
+# Aplicar normalización
+datos_minmax <- datos_brutos
+datos_minmax$edad <- min_max_norm(datos_brutos$edad)
+datos_minmax$horas_estudio <- min_max_norm(datos_brutos$horas_estudio)
+datos_minmax$nota_media <- min_max_norm(datos_brutos$nota_media)
+
+print("Normalización Min-Max (0-1):")
+print(datos_minmax[, columnas_num])
+```
+
+**Interpretación:** Todos los valores están ahora entre 0 y 1, donde 0 es el mínimo original y 1 es el máximo original.
+
+## Método 2: Estandarización Z-score (media=0, sd=1)
+
+**Fórmula:**
+$$X_{std} = \frac{X - \mu}{\sigma}$$
+
+```{r z-score}
+# Estandarización Z-score
+datos_zscore <- datos_brutos
+datos_zscore$edad <- scale(datos_brutos$edad)
+datos_zscore$horas_estudio <- scale(datos_brutos$horas_estudio)
+datos_zscore$nota_media <- scale(datos_brutos$nota_media)
+
+print("Estandarización Z-score:")
+print(datos_zscore[, columnas_num])
+```
+
+## Verificación de Z-score
+
+```{r verificacion-zscore}
+cat("\nMedias (deben ser aprox. 0):\n")
+print(colMeans(datos_zscore[, columnas_num]))
+
+cat("\nDesviaciones estándar (deben ser = 1):\n")
+print(apply(datos_zscore[, columnas_num], 2, sd))
+```
+
+---
+
+# Comparación Visual
+
+```{r comparacion, fig.width=10, fig.height=6}
+# Configurar gráficos
+par(mfrow = c(1, 3), mar = c(5, 4, 4, 2))
+
+# Datos originales
+barplot(datos_brutos$edad, 
+        main = "Datos Originales",
+        ylab = "Edad",
+        col = "lightblue",
+        ylim = c(0, 30))
+
+# Min-Max
+barplot(datos_minmax$edad, 
+        main = "Min-Max (0-1)",
+        ylab = "Edad normalizada",
+        col = "lightgreen",
+        ylim = c(0, 1))
+
+# Z-score
+barplot(as.numeric(datos_zscore$edad), 
+        main = "Z-score",
+        ylab = "Edad estandarizada",
+        col = "lightcoral",
+        ylim = c(-2, 2))
+```
+
+---
+
+# Resumen del Proceso
+
+```{r resumen, echo=FALSE}
+cat("========================================\n")
+cat("PROCESO COMPLETO DE ESTANDARIZACIÓN\n")
+cat("========================================\n\n")
+
+cat("1. CORRECCIÓN DE FORMATOS:\n")
+cat("   * Eliminación de espacios\n")
+cat("   * Uniformización mayúsculas/minúsculas\n")
+cat("   * Estandarización de valores categóricos\n\n")
+
+cat("2. IMPUTACIÓN:\n")
+cat("   * Valores faltantes → mediana\n\n")
+
+cat("3. CODIFICACIÓN:\n")
+cat("   * Booleanas: Sí/No → 1/0\n")
+cat("   * Ordinales: Grado(1), Postgrado(2), Máster(3)\n")
+cat("   * Nominales: One-Hot Encoding\n\n")
+
+cat("4. NORMALIZACIÓN (sentido específico):\n")
+cat("   * Min-Max: valores entre 0 y 1\n")
+cat("   * Z-score: media=0, desviación=1\n")
+cat("========================================\n")
+```
+
+---
+
+# Cuándo usar cada método
+
+| Método | Cuándo usar | Ventajas | Desventajas |
+|--------|-------------|----------|-------------|
+| **Min-Max** | Límites conocidos, sin outliers | Interpretación intuitiva (0-1) | Sensible a outliers |
+| **Z-score** | Distribución normal, hay outliers | Robusto a outliers | Valores sin límite definido |
+| **Robust Scaling** | Muchos outliers | Muy robusto | Menos común |
+
+---
+
+
+# Referencias
+
+- **Funciones R base útiles:**
+  - `trimws()`: eliminar espacios
+  - `toupper()`, `tolower()`, `tools::toTitleCase()`: mayúsculas/minúsculas
+  - `scale()`: estandarización Z-score
+  - `ifelse()`: codificación condicional
+  
+- **Documentación:**
+  - `?scale`
+  - `?trimws`
+  
+---
+
+

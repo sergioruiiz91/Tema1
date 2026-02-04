@@ -1,0 +1,449 @@
+---
+title: "Tipos de Datos: Raw, Technically Correct y Consistent"
+author: "Tractament de les Dades - Universidad de Valencia"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    theme: united
+    highlight: tango
+  pdf_document:
+    toc: true
+    number_sections: true
+    latex_engine: xelatex
+header-includes:
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = "", warning = FALSE, message = FALSE)
+```
+
+# Introducción
+
+En el proceso de tratamiento de datos, distinguimos tres niveles de calidad:
+
+1. **Raw data (Datos brutos)**: Datos tal como salen del sistema, sin procesar
+2. **Technically correct data (Datos técnicamente correctos)**: Tipos de datos correctos y formato válido
+3. **Consistent data (Datos consistentes)**: Formato correcto + consistencia semántica + validación de reglas de negocio
+
+Este documento ilustra las diferencias mediante un ejemplo práctico: **tickets de compra de supermercado**.
+
+---
+
+# Caso de estudio: Tickets de Supermercado
+
+Trabajaremos con datos de 5 tickets de compra para ilustrar cada nivel de calidad.
+
+---
+
+# 1. Raw Data (Datos Brutos)
+
+Los datos brutos son tal como salen del sistema de caja, sin ningún procesamiento.
+
+## Características de los datos brutos
+
+* Múltiples formatos de fecha
+* Espacios innecesarios
+* Tipos de datos incorrectos (números almacenados como texto)
+* Decimales con coma y punto mezclados
+* Categorías inconsistentes (mayúsculas/minúsculas)
+* Errores y valores inválidos sin tratar
+
+```{r raw-data}
+# DATOS BRUTOS: tal como salen del sistema
+raw_data <- data.frame(
+  ticket_id = c("T001", "T002", "T003", "T004", "T005"),
+  fecha = c("2024-01-15", "15/01/2024", "2024.01.16", "16-Ene-24", "ERROR"),
+  producto = c("  LECHE ", "Pan integral", "MANZANAS", "Yogur   ", "aceite oliva"),
+  cantidad = c("2", "1.5", "3", "6", "dos"),
+  precio_unitario = c("1.20", "2,50", "1.80", "0.80", "4.5"),
+  total = c("2.40", "3.75", "5,40", "4.8", "ERROR"),
+  categoria = c("lacteos", "PANADERIA", "frutas", "Lácteos", "Aceites"),
+  stringsAsFactors = FALSE
+)
+
+print(raw_data)
+```
+
+## Estructura de los datos brutos
+
+```{r raw-structure}
+str(raw_data)
+```
+
+**Observación:** Todas las columnas son de tipo `character` (texto), incluso las que deberían ser numéricas o fechas.
+
+---
+
+# 2. Technically Correct Data
+
+Datos que tienen el **tipo correcto** y **formato válido**, pero aún pueden tener inconsistencias semánticas.
+
+## Proceso de corrección técnica
+
+```{r technically-correct}
+# Iniciar con datos brutos
+datos_tecnicos <- raw_data
+
+# 1. CONVERTIR FECHAS
+# Limpiar y estandarizar diferentes formatos de fecha
+datos_tecnicos$fecha <- as.Date(ifelse(
+  datos_tecnicos$fecha == "ERROR", 
+  NA,
+  as.character(as.Date(datos_tecnicos$fecha, tryFormats = c("%Y-%m-%d", "%d/%m/%Y", "%Y.%m.%d")))
+), origin = "1970-01-01")
+
+# 2. ELIMINAR ESPACIOS
+datos_tecnicos$producto <- trimws(datos_tecnicos$producto)
+
+# 3. CONVERTIR CANTIDAD A NUMÉRICO
+# Reemplazar texto por números
+datos_tecnicos$cantidad <- ifelse(datos_tecnicos$cantidad == "dos", "2", datos_tecnicos$cantidad)
+datos_tecnicos$cantidad <- as.numeric(datos_tecnicos$cantidad)
+
+# 4. CONVERTIR PRECIO A NUMÉRICO
+# Reemplazar comas por puntos
+datos_tecnicos$precio_unitario <- as.numeric(gsub(",", ".", datos_tecnicos$precio_unitario))
+
+# 5. CONVERTIR TOTAL A NUMÉRICO
+datos_tecnicos$total <- ifelse(datos_tecnicos$total == "ERROR", NA, datos_tecnicos$total)
+datos_tecnicos$total <- as.numeric(gsub(",", ".", datos_tecnicos$total))
+
+# Mostrar resultado
+print(datos_tecnicos)
+```
+
+## Estructura después de corrección técnica
+
+```{r technically-structure}
+str(datos_tecnicos)
+```
+
+## Mejoras logradas
+
+```{r mejoras-tecnicas, echo=FALSE}
+cat("MEJORAS:\n")
+cat("* Fechas convertidas a tipo Date\n")
+cat("* Espacios eliminados\n")
+cat("* Cantidades y precios como numeric\n")
+cat("* Decimales uniformizados (punto decimal)\n")
+cat("* Valores inválidos convertidos a NA\n\n")
+
+cat("PROBLEMAS PENDIENTES:\n")
+cat("* Nombres de productos inconsistentes (MAYÚSCULAS/minúsculas)\n")
+cat("* Categorías con duplicados semánticos ('lacteos' vs 'Lácteos')\n")
+cat("* No hay validación de reglas de negocio\n")
+```
+
+---
+
+# 3. Consistent Data (Datos Consistentes)
+
+Datos con formato correcto Y **consistencia semántica**, siguiendo reglas de negocio y convenciones uniformes.
+
+## Proceso de estandarización
+
+```{r consistent-data}
+# Partir de datos técnicamente correctos
+datos_consistentes <- datos_tecnicos
+
+# 1. ESTANDARIZAR NOMBRES DE PRODUCTOS (Title Case)
+datos_consistentes$producto <- tools::toTitleCase(tolower(datos_consistentes$producto))
+
+# 2. ESTANDARIZAR CATEGORÍAS
+# Crear mapeo de categorías uniformes
+categorias_map <- c(
+  "lacteos" = "Lácteos",
+  "Lácteos" = "Lácteos",
+  "PANADERIA" = "Panadería",
+  "frutas" = "Frutas",
+  "Aceites" = "Aceites"
+)
+datos_consistentes$categoria <- categorias_map[datos_consistentes$categoria]
+
+# 3. VALIDAR REGLAS DE NEGOCIO
+# Regla: total = cantidad × precio_unitario
+datos_consistentes$total_calculado <- datos_consistentes$cantidad * 
+                                       datos_consistentes$precio_unitario
+
+# Verificar si los totales coinciden (tolerancia de 0.01 por redondeo)
+datos_consistentes$total_correcto <- abs(datos_consistentes$total - 
+                                          datos_consistentes$total_calculado) < 0.01
+
+# Mostrar resultado
+print(datos_consistentes)
+```
+
+## Verificación de consistencia
+
+```{r verificacion-consistencia}
+cat("VALIDACIÓN DE REGLAS DE NEGOCIO:\n")
+cat("--------------------------------\n\n")
+
+# Verificar que todos los totales sean correctos
+totales_validos <- all(datos_consistentes$total_correcto, na.rm = TRUE)
+cat("Todos los totales son correctos:", totales_validos, "\n\n")
+
+# Mostrar detalles de la verificación
+cat("Detalles por ticket:\n")
+for(i in 1:nrow(datos_consistentes)) {
+  if(!is.na(datos_consistentes$total_correcto[i])) {
+    cat(sprintf("Ticket %s: %.2f × %.2f = %.2f [%s]\n",
+                datos_consistentes$ticket_id[i],
+                datos_consistentes$cantidad[i],
+                datos_consistentes$precio_unitario[i],
+                datos_consistentes$total_calculado[i],
+                ifelse(datos_consistentes$total_correcto[i], "OK", "ERROR")))
+  }
+}
+```
+
+## Mejoras adicionales logradas
+
+```{r mejoras-consistencia, echo=FALSE}
+cat("\nMEJORAS ADICIONALES:\n")
+cat("* Nombres en formato Title Case uniforme\n")
+cat("* Categorías estandarizadas (sin duplicados semánticos)\n")
+cat("* Validación de reglas de negocio implementada\n")
+cat("* Convenciones uniformes en todo el dataset\n")
+cat("* Trazabilidad de errores (columna total_correcto)\n")
+```
+
+---
+
+# Comparación Lado a Lado
+
+## Ejemplo 1: Producto "Leche"
+
+```{r comparacion-leche, echo=FALSE}
+cat("EVOLUCIÓN DEL PRODUCTO 'LECHE':\n")
+cat("===============================\n\n")
+cat("Raw data:             '  LECHE ' (con espacios, mayúsculas)\n")
+cat("Technically correct:  'LECHE' (sin espacios, aún en mayúsculas)\n")
+cat("Consistent data:      'Leche' (Title Case estandarizado)\n")
+```
+
+## Ejemplo 2: Fecha
+
+```{r comparacion-fecha, echo=FALSE}
+cat("\nEVOLUCIÓN DE LA FECHA:\n")
+cat("======================\n\n")
+cat("Raw data:             '15/01/2024' (texto, formato variable)\n")
+cat("Technically correct:  2024-01-15 (tipo Date)\n")
+cat("Consistent data:      2024-01-15 (tipo Date + validado)\n")
+```
+
+## Ejemplo 3: Categoría
+
+```{r comparacion-categoria, echo=FALSE}
+cat("\nEVOLUCIÓN DE CATEGORÍAS:\n")
+cat("========================\n\n")
+cat("Raw data:             'lacteos', 'Lácteos' (duplicados semánticos)\n")
+cat("Technically correct:  'lacteos', 'Lácteos' (aún inconsistente)\n")
+cat("Consistent data:      'Lácteos' (estandarizado, sin duplicados)\n")
+```
+
+## Ejemplo 4: Cantidad
+
+```{r comparacion-cantidad, echo=FALSE}
+cat("\nEVOLUCIÓN DE CANTIDAD:\n")
+cat("======================\n\n")
+cat("Raw data:             'dos' (texto)\n")
+cat("Technically correct:  2.0 (numérico)\n")
+cat("Consistent data:      2.0 (numérico + validado con reglas)\n")
+```
+
+---
+
+# Visualización de Categorías
+
+```{r visualizacion, fig.width=10, fig.height=6}
+# Crear gráfico comparativo de categorías
+par(mfrow = c(1, 3), mar = c(10, 4, 4, 2))
+
+# Raw data - categorías originales
+tabla_raw <- table(raw_data$categoria)
+barplot(tabla_raw, 
+        main = "Raw Data",
+        ylab = "Frecuencia",
+        col = "lightcoral",
+        las = 2,
+        cex.names = 0.8)
+
+# Technically correct - mismas inconsistencias
+tabla_tech <- table(datos_tecnicos$categoria)
+barplot(tabla_tech, 
+        main = "Technically Correct",
+        ylab = "Frecuencia",
+        col = "lightyellow",
+        las = 2,
+        cex.names = 0.8)
+
+# Consistent - categorías estandarizadas
+tabla_cons <- table(datos_consistentes$categoria)
+barplot(tabla_cons, 
+        main = "Consistent Data",
+        ylab = "Frecuencia",
+        col = "lightgreen",
+        las = 2,
+        cex.names = 0.8)
+```
+
+**Observación:** Solo en los datos consistentes vemos que "Lácteos" aparece 2 veces (correctamente agrupados).
+
+---
+
+# Resumen Conceptual
+
+```{r resumen-conceptual, echo=FALSE}
+cat("==============================================\n")
+cat("           RESUMEN DE NIVELES DE CALIDAD     \n")
+cat("==============================================\n\n")
+
+cat("1. RAW DATA (Datos Brutos)\n")
+cat("   * Como salen del sistema\n")
+cat("   * Múltiples formatos\n")
+cat("   * Tipos mezclados\n")
+cat("   * Errores sin tratar\n")
+cat("   * Inconsistencias\n\n")
+
+cat("2. TECHNICALLY CORRECT DATA\n")
+cat("   * Tipos de datos correctos\n")
+cat("   * Fechas como Date\n")
+cat("   * Números como numeric\n")
+cat("   * NA para valores inválidos\n")
+cat("   * Sin espacios extras\n")
+cat("   * Aún puede haber inconsistencias semánticas\n\n")
+
+cat("3. CONSISTENT DATA\n")
+cat("   * Todo lo anterior +\n")
+cat("   * Convenciones uniformes\n")
+cat("   * Categorías estandarizadas\n")
+cat("   * Reglas de negocio validadas\n")
+cat("   * Semántica coherente\n")
+cat("   * Listo para análisis\n\n")
+
+cat("==============================================\n")
+```
+
+---
+
+# Diagrama de Flujo del Proceso
+
+```
+┌─────────────────┐
+│   RAW DATA      │  Como sale del sistema
+│   data.frame    │  Todos los campos como character
+└────────┬────────┘
+         │
+         │ 1. Conversión de tipos
+         │ 2. Limpieza de espacios
+         │ 3. Tratamiento de errores
+         │
+┌────────▼─────────────┐
+│ TECHNICALLY CORRECT  │  Tipos correctos
+│      data.frame      │  Formato válido
+└────────┬─────────────┘
+         │
+         │ 1. Estandarización de nombres
+         │ 2. Unificación de categorías
+         │ 3. Validación de reglas
+         │
+┌────────▼──────────┐
+│ CONSISTENT DATA   │  Listo para análisis
+│    data.frame     │  Calidad garantizada
+└───────────────────┘
+```
+
+---
+
+# Funciones Útiles en R
+
+## Conversión de tipos
+
+```{r funciones-conversion, eval=FALSE}
+# Convertir a Date
+as.Date("2024-01-15")
+as.Date("15/01/2024", format = "%d/%m/%Y")
+
+# Convertir a numérico
+as.numeric("123.45")
+as.numeric(gsub(",", ".", "123,45"))  # Reemplazar coma por punto
+
+# Convertir a lógico
+as.logical(c(1, 0, TRUE, FALSE))
+```
+
+## Limpieza de texto
+
+```{r funciones-texto, eval=FALSE}
+# Eliminar espacios
+trimws("  texto  ")
+
+# Cambiar mayúsculas/minúsculas
+toupper("texto")           # TODO MAYÚSCULAS
+tolower("TEXTO")           # todo minúsculas
+tools::toTitleCase("texto")  # Primera Letra Mayúscula
+
+# Reemplazar caracteres
+gsub(",", ".", "1,23")     # Reemplazar todas las comas
+sub(",", ".", "1,23")      # Reemplazar primera coma
+```
+
+## Validación
+
+```{r funciones-validacion, eval=FALSE}
+# Verificar valores faltantes
+is.na(x)
+sum(is.na(x))
+
+# Verificar duplicados
+duplicated(x)
+unique(x)
+
+# Rango de valores
+range(x, na.rm = TRUE)
+```
+
+---
+
+# Ejercicio para Estudiantes
+
+Aplica el proceso completo a este nuevo conjunto de datos:
+
+```{r ejercicio, eval=FALSE}
+# Datos brutos de ventas
+ventas_raw <- data.frame(
+  id = c("V001", "V002", "V003", "V004"),
+  fecha = c("2024-02-01", "01/02/2024", "2024.02.02", "ERROR"),
+  cliente = c("  JUAN PÉREZ ", "maría garcía", "PEDRO lópez", "Ana Torres  "),
+  monto = c("150.50", "200,75", "PENDIENTE", "99.99"),
+  estado = c("PAGADO", "pagado", "Pendiente", "PAGADO"),
+  stringsAsFactors = FALSE
+)
+
+# TAREAS:
+# 1. Convertir a "Technically Correct"
+# 2. Convertir a "Consistent Data"
+# 3. Validar que los estados sean solo "Pagado" o "Pendiente"
+# 4. Crear una columna que indique si el monto es mayor a 100
+
+# Tu código aquí...
+```
+
+---
+
+# Conclusiones
+
+* **Raw data** es el punto de partida, con todos los problemas típicos de datos reales
+* **Technically correct** resuelve problemas técnicos de tipos y formatos
+* **Consistent data** añade consistencia semántica y validación de negocio
+* Solo los **datos consistentes** están listos para análisis estadístico confiable
+
+**Regla de oro:** Nunca analices datos sin pasar por estos tres niveles.
+
+---
+
+**Fin del documento**
