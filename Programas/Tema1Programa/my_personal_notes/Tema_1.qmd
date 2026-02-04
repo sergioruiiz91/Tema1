@@ -1,0 +1,55 @@
+---
+Tittle: "Tema 1: Introducción a la Programación"
+author: "Sergio Ruiz Arévalo"
+---
+
+## Tema 2
+
+> Lo que vamos ha hacer esta asignatura es **analisis exploratorio** , no tenemos suficientes datos , pero con los datos que tenemos queremos buscar mas datos
+
+-   **raw data**: datos en bruto, sin tratar(hay que tratarlos)
+
+-   **clean data**: datos limpios, tratados y preparados para el análisis
+
+-   AEI(analisis exploratorio de la instancias)
+
+-   AEC(analisis exploratorio de las características)
+
+### Tipos de analisis 
+
+-   **Analisis Confirmativo(acd)** = intenta confirmar o refutar algo
+
+-   **Analisis Exploratorio(aed)** = no tenemos suficientes datos , pero con los datos que tenemos queremos buscar mas datos
+
+    ### Etapas 
+
+    -   importacion
+
+    -   preparacion de los datos
+
+    -   transformacion
+
+    -   visualizacion
+
+    -   modelado
+
+    -   comunicacion de los datos
+
+        ### 4R 
+
+        -   **relevacion** = revelar cciertas estructuras en los datos
+
+        -   **residuos** = ver que residuos hay
+
+        -   **re-expresion =** hacer transformaciones de variables para sacar mas variables $v = \frac{e}{t}$
+
+        -   **resistencia** = usar modelos que resistan a valores atipicos
+
+.- **raw data** = siempre se guarda para que se pueda hacer todas las operaciones de nuevo
+-   **tydy data set** = cada variable es una columna y cada fila es una observacion(pero puede todavia estar sucio) 
+-   **code book(metadata)** = es un fichero que explica cada una de las variables que hay en el conjunto de datos 
+-   **data frame** = es una tabla de datos en la que cada columna es una variable y cada fila es una observacion(limpito , ordenado y listo para analizar) 
+-  **data cleaning** = es el proceso de limpiar los datos para que esten listos para analizar
+  
+
+
