@@ -52,4 +52,14 @@ author: "Sergio Ruiz Arévalo"
 -  **data cleaning** = es el proceso de limpiar los datos para que esten listos para analizar
   
 
+### Formas para ver datasets de las librerias de R 
+```{r} 
+# data(package = "datasets") 
+# data(package = "signal")
+# data(package = "tidyr") 
 
+# library(MASS)
+# data(package  = "MASS" ) 
+
+str(data(package = "MASS" )) # It shows the structure of data sets and the factors that are in the data sets of the MASS library.m
+``` 
